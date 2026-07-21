@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="nari管理">
+<meta name="theme-color" content="#183451">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>nari-management</title>
+<style>
+  :root{
+    /* 既定パレット（リヴィエラ）。JSのapplyPaletteで上書き */
+    --bg:#F3ECDE; --surface:#FBF7EF; --ink:#1E2E3D; --muted:#8A8072; --border:#E6DCCB;
+    --accent:#A9501C; --secondary:#183451; --danger:#B23A2E; --hero:#183451; --hero-ink:#F3ECDE;
+    --radius:18px; --shadow:0 1px 2px rgba(50,40,25,.06),0 8px 22px rgba(50,40,25,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink); line-height:1.55; padding-bottom:92px;
+    -webkit-font-smoothing:antialiased; transition:background .3s;
+  }
+  .wrap{max-width:680px;margin:0 auto;padding:0 16px}
+  header.app{padding:18px 0 6px;display:flex;align-items:baseline;justify-content:space-between}
+  header.app h1{font-size:19px;margin:0;letter-spacing:.02em;font-weight:800}
+  header.app h1 span{color:var(--accent)}
+  header.app .date{font-size:13px;color:var(--muted)}
+  h2.section{font-size:13.5px;color:var(--muted);margin:22px 0 10px;font-weight:700;letter-spacing:.03em;display:flex;align-items:center;gap:5px}
+  h2.section svg{opacity:.85}
+  .ic-svg{vertical-align:middle;flex:none}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+  /* ヒーロー */
+  .hero{background:var(--hero);color:var(--hero-ink);border-radius:22px;padding:20px 20px 18px;margin-top:6px;box-shadow:var(--shadow)}
+  .hero-sub{font-size:12.5px;opacity:.8;font-weight:600;letter-spacing:.04em}
+  .hero-title{font-size:23px;font-weight:800;margin:2px 0 12px}
+  .hero-chips{display:flex;gap:8px;flex-wrap:wrap}
+  .hchip{background:color-mix(in srgb,var(--hero-ink) 18%,transparent);color:var(--hero-ink);font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:999px}
+  .hchip.warn{background:color-mix(in srgb,#fff 88%,var(--danger));color:var(--danger)}
+
+  /* プロジェクト進捗カード */
+  .proj-card{padding:14px 16px;margin-bottom:10px}
+  .pc-top{display:flex;align-items:center;gap:9px}
+  .pdot{width:11px;height:11px;border-radius:50%;flex:none}
+  .pc-name{flex:1;font-weight:700;font-size:15px}
+  .pc-count{font-size:12.5px;color:var(--muted);font-weight:600;background:color-mix(in srgb,var(--ink) 6%,var(--surface));padding:3px 9px;border-radius:999px}
+  .pc-bar{height:9px;background:color-mix(in srgb,var(--ink) 8%,var(--surface));border-radius:999px;margin:11px 0 7px;overflow:hidden}
+  .pc-bar > i{display:block;height:100%;border-radius:999px;transition:width .35s}
+  .pc-meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+  .pc-meta b{color:var(--ink);font-weight:800}
+
+  /* タスクカード */
+  .task{padding:15px 16px;margin-bottom:11px}
+  .task .top{display:flex;gap:11px;align-items:flex-start}
+  .task .title{font-weight:700;font-size:15.5px;flex:1;word-break:break-word}
+  .task.done .title{color:var(--muted);text-decoration:line-through}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap;font-weight:700}
+  .pill.flow{background:color-mix(in srgb,var(--secondary) 15%,var(--surface));color:var(--secondary)}
+  .pill.single{background:color-mix(in srgb,var(--ink) 7%,var(--surface));color:var(--muted)}
+  .pill.pri3{background:color-mix(in srgb,var(--danger) 15%,var(--surface));color:var(--danger)}
+  .pill.pri2{background:color-mix(in srgb,var(--accent) 16%,var(--surface));color:var(--accent)}
+  .pill.pri1{background:color-mix(in srgb,var(--ink) 7%,var(--surface));color:var(--muted)}
+  .meta{font-size:12.5px;color:var(--muted);margin-top:7px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .meta .over{color:var(--danger);font-weight:700}
+  .meta .soon{color:var(--accent);font-weight:700}
+  .note{font-size:13px;color:color-mix(in srgb,var(--ink) 65%,var(--surface));margin-top:7px;white-space:pre-wrap}
+
+  .check{width:25px;height:25px;border-radius:9px;border:2px solid color-mix(in srgb,var(--ink) 22%,var(--surface));flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--surface);margin-top:1px;transition:.15s}
+  .check.on{background:var(--secondary);border-color:var(--secondary)}
+  .check.on::after{content:"✓";color:#fff;font-size:15px;font-weight:800}
+
+  .steps{margin-top:13px;display:flex;flex-direction:column;gap:2px}
+  .step{display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:11px}
+  .step.cur{background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+  .step .dot{width:19px;height:19px;border-radius:50%;border:2px solid color-mix(in srgb,var(--ink) 22%,var(--surface));flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;background:var(--surface)}
+  .step.done .dot{background:var(--secondary);border-color:var(--secondary);color:#fff}
+  .step.done .dot::after{content:"✓"}
+  .step .sname{flex:1;font-size:14px}
+  .step.done .sname{color:var(--muted);text-decoration:line-through}
+  .step.cur .sname{font-weight:800}
+  .step .sdue{font-size:12px;color:var(--muted)}
+  .step .sdue.over{color:var(--danger);font-weight:700}
+  .step .sdue.soon{color:var(--accent);font-weight:700}
+  .progress{height:8px;background:color-mix(in srgb,var(--ink) 8%,var(--surface));border-radius:999px;margin-top:11px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:var(--secondary);border-radius:999px;transition:.3s}
+
+  .rowbtns{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap}
+  button{font-family:inherit;font-size:14px;border:none;cursor:pointer;border-radius:12px;padding:10px 15px;font-weight:700;transition:.12s}
+  button:active{transform:translateY(1px)}
+  .btn{background:var(--accent);color:#fff}
+  .btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--border)}
+  .btn.green{background:var(--secondary);color:#fff}
+  .btn.sm{padding:7px 12px;font-size:13px}
+  .btn.link{background:none;color:var(--muted);padding:6px 4px;font-weight:600}
+  .btn.danger{background:none;color:var(--danger);border:1px solid color-mix(in srgb,var(--danger) 30%,var(--surface))}
+
+  .reco{border-left:4px solid var(--accent)}
+  .remind{background:color-mix(in srgb,var(--danger) 7%,var(--surface));border:1px solid color-mix(in srgb,var(--danger) 22%,var(--surface));border-left:4px solid var(--danger);padding:13px 15px;border-radius:var(--radius);margin-bottom:10px}
+  .remind .r-title{font-weight:800;font-size:14px;color:var(--danger)}
+  .remind .r-line{font-size:13.5px;margin-top:4px}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:26px 10px}
+
+  nav.tabs{position:fixed;bottom:0;left:0;right:0;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(10px);border-top:1px solid var(--border);display:flex;padding:9px 0 calc(9px + env(safe-area-inset-bottom))}
+  nav.tabs button{flex:1;background:none;color:var(--muted);font-size:11.5px;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px}
+  nav.tabs button.on{color:var(--accent)}
+
+  .fab{position:fixed;right:18px;bottom:calc(80px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;background:var(--accent);color:#fff;box-shadow:0 8px 20px color-mix(in srgb,var(--accent) 45%,transparent);display:flex;align-items:center;justify-content:center;z-index:20}
+
+  .overlay{position:fixed;inset:0;background:rgba(30,25,15,.4);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .overlay.on{display:flex}
+  .sheet{background:var(--bg);width:100%;max-width:680px;max-height:92vh;overflow-y:auto;border-radius:24px 24px 0 0;padding:20px 16px calc(24px + env(safe-area-inset-bottom))}
+  .sheet h3{margin:4px 0 16px;font-size:17px;font-weight:800}
+  label.f{display:block;font-size:13px;color:var(--muted);font-weight:700;margin:14px 0 6px}
+  input,select,textarea{width:100%;font-family:inherit;font-size:15px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--ink)}
+  textarea{min-height:64px;resize:vertical}
+  .seg{display:flex;gap:8px}
+  .seg label{flex:1;text-align:center;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);font-size:14px;font-weight:700;cursor:pointer;color:var(--muted)}
+  .seg input{display:none}
+  .seg label:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface));color:var(--accent)}
+  .previewbox{background:var(--surface);border:1px dashed var(--border);border-radius:12px;padding:11px 13px;margin-top:10px;font-size:13px}
+  .previewbox .pl{display:flex;justify-content:space-between;padding:3px 0;color:color-mix(in srgb,var(--ink) 65%,var(--surface))}
+  .previewbox .pl b{font-weight:700;color:var(--ink)}
+  .sheet-actions{display:flex;gap:10px;margin-top:22px}
+  .sheet-actions .btn{flex:1;padding:14px}
+
+  .tmpl-step{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .tmpl-step input.nm{flex:1}
+  .tmpl-step input.of{width:72px;text-align:center}
+  .tmpl-step .x{color:var(--danger);background:none;border:none;font-size:20px;padding:4px 8px;cursor:pointer}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .settings-card{padding:16px;margin-bottom:12px}
+  .settings-card h3{margin:0 0 4px;font-size:15px;font-weight:800}
+  .filterbar{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px}
+  .filterbar button{background:var(--surface);border:1px solid var(--border);color:var(--muted);white-space:nowrap;padding:8px 14px;font-size:13px}
+  .filterbar button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .customrange{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .customrange input{flex:1}
+  .customrange span{color:var(--muted);font-size:13px}
+  .toggle-done{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:2px 0 10px}
+  .toggle-done input{width:auto}
+
+  /* パレット選択 */
+  .pal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pal{border:2px solid var(--border);border-radius:14px;padding:12px;cursor:pointer;background:var(--surface)}
+  .pal.on{border-color:var(--accent)}
+  .pal .sw{display:flex;gap:5px;margin-bottom:8px}
+  .pal .sw i{width:26px;height:26px;border-radius:7px;display:block}
+  .pal .pn{font-size:13.5px;font-weight:700}
+  .pal .chk{font-size:11px;color:var(--accent);font-weight:700;height:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <h1>nari <span>management</span></h1>
+    <span class="date" id="todayLabel"></span>
+  </header>
+  <main id="view"></main>
+</div>
+
+<div class="fab" id="fab"></div>
+
+<nav class="tabs">
+  <button data-tab="home" class="on"><span class="tabic" data-ic="home"></span>今日</button>
+  <button data-tab="tasks"><span class="tabic" data-ic="folder"></span>タスク</button>
+  <button data-tab="settings"><span class="tabic" data-ic="gear"></span>設定</button>
+</nav>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+//========================= アイコン（ソリッド） =========================
+const IC={
+  home:"M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z",
+  folder:"M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8z",
+  gear:"M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54A.48.48 0 0014.5 2h-3.84a.48.48 0 00-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 00-.59.22L2.7 8.87a.48.48 0 00.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94L2.8 14.52a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 00-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z",
+  plus:"M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z",
+  bell:"M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4a1.5 1.5 0 00-3 0v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z",
+  star:"M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z",
+  pencil:"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  check:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+};
+function icon(name,size=20){return `<svg class="ic-svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><path d="${IC[name]}"/></svg>`;}
+
+//========================= パレット =========================
+const PALETTES={
+  riviera:{label:"リヴィエラ",bg:"#F3ECDE",surface:"#FBF7EF",ink:"#1E2E3D",muted:"#8A8072",border:"#E6DCCB",accent:"#A9501C",secondary:"#183451",danger:"#B23A2E",hero:"#183451",heroInk:"#F3ECDE",sw:["#183451","#A9501C","#D4AF83"]},
+  citrus:{label:"シトラス",bg:"#FBF3E7",surface:"#FFFFFF",ink:"#3A2E22",muted:"#A08A6E",border:"#F0E2CE",accent:"#ED802A",secondary:"#65BCB5",danger:"#C4402A",hero:"#65BCB5",heroInk:"#FFFFFF",sw:["#ED802A","#65BCB5","#EDC45A"]},
+  tangelo:{label:"タンジェロ",bg:"#FCF1E2",surface:"#FFFFFF",ink:"#663924",muted:"#A38066",border:"#F0DDC8",accent:"#D54C15",secondary:"#8DB6C7",danger:"#C0402A",hero:"#663924",heroInk:"#F9E8D4",sw:["#D54C15","#663924","#8DB6C7"]},
+  aegean:{label:"エーゲ",bg:"#F2EEE2",surface:"#FBF8F0",ink:"#33403A",muted:"#8C8778",border:"#E4DECB",accent:"#984A39",secondary:"#76845B",danger:"#A8412F",hero:"#76845B",heroInk:"#F2EEE2",sw:["#984A39","#76845B","#D8D3B3"]},
+};
+function applyPalette(key){
+  const p=PALETTES[key]||PALETTES.riviera;const r=document.documentElement.style;
+  r.setProperty("--bg",p.bg);r.setProperty("--surface",p.surface);r.setProperty("--ink",p.ink);
+  r.setProperty("--muted",p.muted);r.setProperty("--border",p.border);r.setProperty("--accent",p.accent);
+  r.setProperty("--secondary",p.secondary);r.setProperty("--danger",p.danger);
+  r.setProperty("--hero",p.hero);r.setProperty("--hero-ink",p.heroInk);
+}
+
+//========================= データ層 =========================
+const KEY="nari-management-v1";
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+function todayStr(){return ymd(new Date());}
+function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function parseD(s){if(!s)return null;const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);}
+function addDays(s,n){const d=parseD(s);if(!d)return null;d.setDate(d.getDate()+n);return ymd(d);}
+function daysBetween(a,b){const A=parseD(a),B=parseD(b);if(!A||!B)return null;return Math.round((B-A)/86400000);}
+const WD=["日","月","火","水","木","金","土"];
+function fmtDate(s){if(!s)return"";const d=parseD(s);return (d.getMonth()+1)+"/"+d.getDate()+"("+WD[d.getDay()]+")";}
+
+let state=load();
+function load(){try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(!s.settings)s.settings={};if(!s.settings.palette)s.settings.palette="riviera";if(s.settings.staleDays==null)s.settings.staleDays=5;return s;}}catch(e){}return seed();}
+function save(push=true){if(push)state.updated_at=Date.now();localStorage.setItem(KEY,JSON.stringify(state));if(push)schedulePush();}
+function seed(){
+  return {
+    projects:[
+      {id:"p_ttf",name:"Table to Farm",color:"#984A39"},
+      {id:"p_yt",name:"Tona YouTube",color:"#A9501C"},
+    ],
+    templates:[
+      {id:"t_yt",name:"YouTube",anchorLabel:"撮影",steps:[
+        {name:"香盤表作成",offset:-1},{name:"撮影",offset:0},{name:"動画選定",offset:3},
+        {name:"編集",offset:4},{name:"編集確認",offset:6},{name:"サムネ作成",offset:6},{name:"投稿設定",offset:7},
+      ]},
+    ],
+    tasks:[],
+    settings:{staleDays:5,palette:"riviera"},
+    updated_at:Date.now(),
+  };
+}
+
+//========================= 同期（Supabase） =========================
+let sb=null, sbUser=null, lastSync=0, syncStatus="";
+let pushTimer=null, otpSent=false, otpEmail="";
+function sbConfig(){try{return JSON.parse(localStorage.getItem("nari-sb")||"null");}catch(e){return null;}}
+function setSbConfig(c){localStorage.setItem("nari-sb",JSON.stringify(c));}
+
+async function initSupabase(){
+  const cfg=sbConfig();
+  if(!cfg||!window.supabase)return;
+  try{
+    sb=window.supabase.createClient(cfg.url,cfg.key);
+    const {data:{session}}=await sb.auth.getSession();
+    sbUser=session?.user||null;
+    sb.auth.onAuthStateChange((_e,s)=>{const was=!!sbUser;sbUser=s?.user||null;if(sbUser)pullThenMaybePush();if(tab==="settings")render();});
+    if(sbUser)await pullThenMaybePush();
+  }catch(e){syncStatus="err";}
+}
+function schedulePush(){if(!sb||!sbUser)return;clearTimeout(pushTimer);pushTimer=setTimeout(pushRemote,800);}
+async function pushRemote(){
+  if(!sb||!sbUser)return;
+  try{
+    const {error}=await sb.from("app_state").upsert({user_id:sbUser.id,data:state,updated_at:new Date().toISOString()});
+    if(error)throw error;syncStatus="ok";lastSync=Date.now();
+  }catch(e){syncStatus="err";}
+  if(tab==="settings")render();
+}
+async function pullThenMaybePush(){
+  if(!sb||!sbUser)return;
+  try{
+    const {data,error}=await sb.from("app_state").select("data").eq("user_id",sbUser.id).maybeSingle();
+    if(error)throw error;
+    if(!data){await pushRemote();}
+    else{
+      const remote=data.data,rl=(remote&&remote.updated_at)||0,ll=state.updated_at||0;
+      if(rl>ll){state=remote;save(false);applyPalette(state.settings?.palette||"riviera");render();}
+      else if(ll>rl){await pushRemote();}
+    }
+    syncStatus="ok";lastSync=Date.now();
+  }catch(e){syncStatus="err";}
+  if(tab==="settings")render();
+}
+
+//========================= ヘルパ =========================
+const proj=id=>state.projects.find(p=>p.id===id);
+const tmpl=id=>state.templates.find(t=>t.id===id);
+function projName(t){const p=proj(t.project_id);return p?p.name:"（未分類）";}
+function projColor(t){const p=proj(t.project_id);return p?p.color:"#8A8072";}
+function curStepIndex(task){if(task.type!=="flow")return -1;return task.steps.findIndex(st=>!st.done);}
+function refDue(task){if(task.type==="single")return task.due||null;const i=curStepIndex(task);return i>=0?task.steps[i].due:null;}
+function isDone(task){if(task.type==="single")return task.status==="done";return task.steps.length>0&&task.steps.every(s=>s.done);}
+function touch(task){task.last_touched_at=todayStr();task.updated_at=Date.now();}
+function score(task){
+  let sc=(task.priority||1)*10;const due=refDue(task);
+  if(due){const d=daysBetween(todayStr(),due);
+    if(d<0)sc+=40+Math.min(-d,10)*2;else if(d===0)sc+=30;else if(d<=2)sc+=18;else if(d<=6)sc+=8;}
+  const st=daysBetween(task.last_touched_at||task.created_at,todayStr());
+  if(st!=null)sc+=Math.min(st,14)*1.5;
+  return sc;
+}
+// 期間フィルタ
+function inRange(d,from,to){if(from===null&&to===null)return true;if(!d)return false;if(from&&d<from)return false;if(to&&d>to)return false;return true;}
+function periodRange(){
+  if(period==="all")return[null,null];
+  if(period==="custom")return[customFrom||null,customTo||null];
+  const d=new Date();
+  if(period==="week"){const dow=(d.getDay()+6)%7;const f=new Date(d);f.setDate(d.getDate()-dow);const t=new Date(f);t.setDate(f.getDate()+6);return[ymd(f),ymd(t)];}
+  const f=new Date(d.getFullYear(),d.getMonth(),1);const t=new Date(d.getFullYear(),d.getMonth()+1,0);return[ymd(f),ymd(t)];
+}
+// 期間内の「作業単位」（単発=タスク、フロー=各ステップ）
+function unitsInPeriod(task,from,to){
+  if(task.type==="single")return inRange(task.due,from,to)?[{done:isDone(task)}]:[];
+  return task.steps.filter(s=>inRange(s.due,from,to)).map(s=>({done:s.done}));
+}
+
+//========================= 状態 =========================
+let tab="home", taskFilter="all", showDone=false;
+let period="week", customFrom=null, customTo=null;
+const view=document.getElementById("view");
+
+function render(){
+  document.getElementById("todayLabel").textContent=fmtDate(todayStr());
+  if(tab==="home")renderHome();else if(tab==="tasks")renderTasks();else renderSettings();
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
+}
+
+//========================= 今日（ダッシュボード） =========================
+function renderHome(){
+  const [from,to]=periodRange();
+  const active=state.tasks.filter(t=>!isDone(t));
+  const dueToday=active.filter(t=>refDue(t)===todayStr()).length;
+  const overdue=active.filter(t=>{const d=refDue(t);return d&&daysBetween(todayStr(),d)<0;}).length;
+
+  let h=`<div class="hero">
+    <div class="hero-sub">${fmtDate(todayStr())}</div>
+    <div class="hero-title">今日のタスク</div>
+    <div class="hero-chips">
+      <span class="hchip">未完了 ${active.length}</span>
+      <span class="hchip">今日締切 ${dueToday}</span>
+      ${overdue?`<span class="hchip warn">遅れ ${overdue}</span>`:""}
+    </div>
+  </div>`;
+
+  // プロジェクト進捗（期間フィルタ）
+  h+=`<h2 class="section">${icon("folder",16)} プロジェクト進捗</h2>`;
+  h+=periodBar();
+  if(state.projects.length===0)h+=`<div class="empty">プロジェクトがありません。</div>`;
+  state.projects.forEach(p=>{
+    const tasks=state.tasks.filter(t=>t.project_id===p.id);
+    let done=0,total=0;
+    tasks.forEach(t=>unitsInPeriod(t,from,to).forEach(u=>{total++;if(u.done)done++;}));
+    const pct=total?Math.round(done/total*100):0;
+    h+=`<div class="proj-card card">
+      <div class="pc-top"><span class="pdot" style="background:${p.color}"></span>
+        <span class="pc-name">${esc(p.name)}</span>
+        <span class="pc-count">${tasks.length}件</span></div>
+      <div class="pc-bar"><i style="width:${pct}%;background:${p.color}"></i></div>
+      <div class="pc-meta"><span>${total?`この期間 ${done}/${total} 完了`:"この期間のタスクなし"}</span><b>${pct}%</b></div>
+    </div>`;
+  });
+
+  // リマインド
+  const reminders=[];
+  active.forEach(t=>{
+    const due=refDue(t);const sn=t.type==="flow"&&curStepIndex(t)>=0?t.steps[curStepIndex(t)].name:null;
+    if(due){const d=daysBetween(todayStr(),due);if(d<0)reminders.push({t,kind:"over",n:-d,sn,due});}
+    const st=daysBetween(t.last_touched_at||t.created_at,todayStr());
+    if(st!=null&&st>=state.settings.staleDays&&!(due&&daysBetween(todayStr(),due)<0))reminders.push({t,kind:"stale",n:st,sn,due});
+  });
+  reminders.sort((a,b)=>b.n-a.n);
+  if(reminders.length){
+    h+=`<h2 class="section">${icon("bell",16)} リマインド</h2>`;
+    reminders.slice(0,6).forEach(r=>{
+      const label=r.kind==="over"?`期限を${r.n}日すぎています`:`${r.n}日間動いていません`;
+      const where=r.sn?`「${esc(r.sn)}」の`:"";
+      h+=`<div class="remind"><div class="r-title">${esc(projName(r.t))} ・ ${esc(r.t.title)}</div>
+        <div class="r-line">${where}${label}${r.due?`（期日 ${fmtDate(r.due)}）`:""}</div></div>`;
+    });
+  }
+
+  // 今日のおすすめ
+  h+=`<h2 class="section">${icon("star",16)} 今日のおすすめ</h2>`;
+  const reco=[...active].sort((a,b)=>score(b)-score(a)).slice(0,3);
+  if(reco.length===0)h+=`<div class="empty">未完了のタスクがありません。<br>右下の＋から追加しましょう。</div>`;
+  else reco.forEach(t=>h+=taskCard(t,true));
+
+  view.innerHTML=h;
+  view.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{period=b.dataset.p;render();});
+  const cf=document.getElementById("cf");if(cf)cf.onchange=e=>{customFrom=e.target.value||null;render();};
+  const ct=document.getElementById("ct");if(ct)ct.onchange=e=>{customTo=e.target.value||null;render();};
+  bindTaskCards();
+}
+function periodBar(){
+  const opts=[["week","今週"],["month","今月"],["all","全期間"],["custom","カスタム"]];
+  let h=`<div class="filterbar">`+opts.map(([k,l])=>`<button data-p="${k}" class="${period===k?"on":""}">${l}</button>`).join("")+`</div>`;
+  if(period==="custom")h+=`<div class="customrange"><input type="date" id="cf" value="${customFrom||""}"><span>〜</span><input type="date" id="ct" value="${customTo||""}"></div>`;
+  return h;
+}
+
+//========================= タスク一覧 =========================
+function renderTasks(){
+  let h=`<div class="filterbar"><button data-f="all" class="${taskFilter==="all"?"on":""}">すべて</button>`;
+  state.projects.forEach(p=>h+=`<button data-f="${p.id}" class="${taskFilter===p.id?"on":""}">${esc(p.name)}</button>`);
+  h+=`</div>`;
+  h+=`<label class="toggle-done"><input type="checkbox" id="showDone" ${showDone?"checked":""}> 完了したタスクも表示</label>`;
+  let list=state.tasks.slice();
+  if(taskFilter!=="all")list=list.filter(t=>t.project_id===taskFilter);
+  if(!showDone)list=list.filter(t=>!isDone(t));
+  list.sort((a,b)=>{const da=isDone(a),db=isDone(b);if(da!==db)return da?1:-1;return score(b)-score(a);});
+  if(list.length===0)h+=`<div class="empty">タスクがありません。</div>`;
+  else list.forEach(t=>h+=taskCard(t,false));
+  view.innerHTML=h;
+  document.querySelectorAll(".filterbar button").forEach(b=>b.onclick=()=>{taskFilter=b.dataset.f;render();});
+  document.getElementById("showDone").onchange=e=>{showDone=e.target.checked;render();};
+  bindTaskCards();
+}
+
+function taskCard(t,compact){
+  const done=isDone(t);
+  const priTxt={1:"低",2:"中",3:"高"}[t.priority||1];
+  const pc=projColor(t);
+  let inner=`<div class="task card ${done?"done":""} ${compact?"reco":""}" data-id="${t.id}"><div class="top">`;
+  if(t.type==="single")inner+=`<div class="check ${done?"on":""}" data-act="toggle-single"></div>`;
+  inner+=`<div style="flex:1"><div class="title">${esc(t.title)}</div><div class="meta">
+    <span class="pill" style="background:color-mix(in srgb, ${pc} 15%, var(--surface));color:${pc}">${esc(projName(t))}</span>
+    <span class="pill ${t.type==="flow"?"flow":"single"}">${t.type==="flow"?"フロー":"単発"}</span>
+    <span class="pill pri${t.priority||1}">優先${priTxt}</span>`;
+  const due=refDue(t);
+  if(t.type==="single"&&due)inner+=dueSpan(due);
+  inner+=`</div>`;
+  if(t.note)inner+=`<div class="note">${esc(t.note)}</div>`;
+  inner+=`</div></div>`;
+  if(t.type==="flow"){
+    const ci=curStepIndex(t);const dc=t.steps.filter(s=>s.done).length;
+    inner+=`<div class="progress"><i style="width:${t.steps.length?dc/t.steps.length*100:0}%"></i></div><div class="steps">`;
+    t.steps.forEach((s,i)=>{inner+=`<div class="step ${s.done?"done":""} ${i===ci?"cur":""}">
+      <div class="dot" data-act="toggle-step" data-i="${i}"></div><div class="sname">${esc(s.name)}</div>
+      ${s.due?dueSpan(s.due,true):""}</div>`;});
+    inner+=`</div>`;
+    if(!done&&ci>=0)inner+=`<div class="rowbtns"><button class="btn green sm" data-act="advance">${icon("check",15)} 「${esc(t.steps[ci].name)}」を完了</button><button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
+    else inner+=`<div class="rowbtns"><button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
+  }else{
+    inner+=`<div class="rowbtns"><button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
+  }
+  return inner;
+}
+function dueSpan(due,forStep){
+  const d=daysBetween(todayStr(),due);let cls="";
+  if(d<0)cls="over";else if(d<=2)cls="soon";
+  const tail=d<0?` (${-d}日超過)`:d===0?" (今日)":d<=2?` (あと${d}日)`:"";
+  if(forStep)return `<span class="sdue ${cls}">${fmtDate(due)}${tail}</span>`;
+  return `<span class="${cls}">期日 ${fmtDate(due)}${tail}</span>`;
+}
+function bindTaskCards(){
+  view.querySelectorAll(".task").forEach(el=>{
+    const t=state.tasks.find(x=>x.id===el.dataset.id);if(!t)return;
+    el.querySelectorAll("[data-act]").forEach(b=>b.onclick=e=>{
+      e.stopPropagation();const act=b.dataset.act;
+      if(act==="toggle-single"){t.status=t.status==="done"?"active":"done";t.done_at=t.status==="done"?todayStr():null;touch(t);}
+      else if(act==="toggle-step"){t.steps[+b.dataset.i].done=!t.steps[+b.dataset.i].done;touch(t);}
+      else if(act==="advance"){const ci=curStepIndex(t);if(ci>=0)t.steps[ci].done=true;touch(t);}
+      else if(act==="edit"){openTaskSheet(t);return;}
+      save();render();
+    });
+  });
+}
+
+//========================= 追加/編集シート =========================
+const overlay=document.getElementById("overlay"),sheet=document.getElementById("sheet");
+function closeSheet(){overlay.classList.remove("on");sheet.innerHTML="";}
+overlay.onclick=e=>{if(e.target===overlay)closeSheet();};
+
+function openTaskSheet(edit){
+  const t=edit||{},isEdit=!!edit,type=t.type||"single";
+  let h=`<h3>${isEdit?"タスクを編集":"タスクを追加"}</h3>`;
+  h+=`<label class="f">タイトル</label><input id="f-title" value="${isEdit?escAttr(t.title):""}" placeholder="例：味噌の回 / 商品リサーチ">`;
+  h+=`<label class="f">プロジェクト</label><select id="f-proj">${state.projects.map(p=>`<option value="${p.id}" ${t.project_id===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`;
+  if(!isEdit){
+    h+=`<label class="f">種類</label><div class="seg" id="f-type">
+      <label><input type="radio" name="ty" value="single" ${type==="single"?"checked":""}><span>単発（1回で完了）</span></label>
+      <label><input type="radio" name="ty" value="flow" ${type==="flow"?"checked":""}><span>フロー（手順あり）</span></label></div>`;
+    h+=`<div id="f-flowarea"></div>`;
+  }else if(type==="flow"){
+    h+=`<label class="f">基準日（${esc(tmplLabelOf(t))}）</label><input type="date" id="f-anchor" value="${t.anchor_date||""}">
+    <div class="hint">基準日を変えて保存すると、全工程の期日が再計算されます（下の個別調整は上書き）。完了状態は保持されます。</div>`;
+    h+=`<label class="f">各工程の期日（個別に調整可）</label>`;
+    t.steps.forEach((s,i)=>h+=`<div class="tmpl-step"><input class="nm" value="${escAttr(s.name)}" disabled><input type="date" class="stepdue" data-i="${i}" value="${s.due||""}" style="width:auto"></div>`);
+  }
+  h+=`<label class="f">優先度</label><div class="seg" id="f-pri">${[1,2,3].map(p=>`<label><input type="radio" name="pri" value="${p}" ${(t.priority||1)===p?"checked":""}><span>${{1:"低",2:"中",3:"高"}[p]}</span></label>`).join("")}</div>`;
+  if(isEdit&&type==="single")h+=`<label class="f">期日（任意）</label><input type="date" id="f-due" value="${t.due||""}">`;
+  h+=`<label class="f">メモ（任意）</label><textarea id="f-note" placeholder="補足があれば">${isEdit?esc(t.note||""):""}</textarea>`;
+  h+=`<div class="sheet-actions"><button class="btn ghost" id="f-cancel">キャンセル</button><button class="btn" id="f-save">${isEdit?"保存":"追加する"}</button></div>`;
+  if(isEdit)h+=`<div style="text-align:center;margin-top:10px"><button class="btn danger" id="f-del">このタスクを削除</button></div>`;
+  sheet.innerHTML=h;overlay.classList.add("on");
+
+  if(!isEdit){
+    const flowArea=document.getElementById("f-flowarea");
+    const renderFlowArea=()=>{
+      const ty=sheet.querySelector('input[name="ty"]:checked').value;
+      if(ty==="single"){flowArea.innerHTML=`<label class="f">期日（任意）</label><input type="date" id="f-due">`;return;}
+      flowArea.innerHTML=`<label class="f">テンプレート</label><select id="f-tmpl">${state.templates.map(tp=>`<option value="${tp.id}">${esc(tp.name)}</option>`).join("")}</select>
+        <label class="f" id="f-anchor-lbl">基準日</label><input type="date" id="f-anchor" value="${todayStr()}">
+        <div class="previewbox" id="f-preview"></div>`;
+      const upd=()=>{
+        const tp=tmpl(document.getElementById("f-tmpl").value);
+        document.getElementById("f-anchor-lbl").textContent=`基準日（${tp.anchorLabel}）`;
+        const anchor=document.getElementById("f-anchor").value;
+        let pv=`<div style="font-weight:700;margin-bottom:6px;color:var(--ink)">自動生成される期日</div>`;
+        tp.steps.forEach(s=>{const due=anchor?addDays(anchor,s.offset):"—";const off=s.offset===0?"基準":(s.offset>0?"+"+s.offset:s.offset)+"日";
+          pv+=`<div class="pl"><span>${esc(s.name)} <span style="color:var(--muted)">(${off})</span></span><b>${anchor?fmtDate(due):"—"}</b></div>`;});
+        document.getElementById("f-preview").innerHTML=pv;
+      };
+      document.getElementById("f-tmpl").onchange=upd;document.getElementById("f-anchor").oninput=upd;upd();
+    };
+    sheet.querySelectorAll('input[name="ty"]').forEach(r=>r.onchange=renderFlowArea);renderFlowArea();
+  }
+  document.getElementById("f-cancel").onclick=closeSheet;
+  if(isEdit)document.getElementById("f-del").onclick=()=>{if(confirm("このタスクを削除しますか？")){state.tasks=state.tasks.filter(x=>x.id!==t.id);save();closeSheet();render();}};
+  document.getElementById("f-save").onclick=()=>saveTask(edit);
+}
+function tmplLabelOf(t){const tp=tmpl(t.template_id);return tp?tp.anchorLabel:"基準";}
+
+function saveTask(edit){
+  const title=document.getElementById("f-title").value.trim();
+  if(!title){alert("タイトルを入力してください");return;}
+  const project_id=document.getElementById("f-proj").value;
+  const priority=+sheet.querySelector('input[name="pri"]:checked').value;
+  const note=document.getElementById("f-note").value.trim();
+  if(edit){
+    edit.title=title;edit.project_id=project_id;edit.priority=priority;edit.note=note;
+    if(edit.type==="single")edit.due=document.getElementById("f-due").value||null;
+    else if(edit.type==="flow"){
+      const anchor=document.getElementById("f-anchor").value||null,origAnchor=edit.anchor_date||null;
+      if(anchor!==origAnchor)edit.steps.forEach(s=>{s.due=anchor&&s.offset!=null?addDays(anchor,s.offset):null;});
+      else sheet.querySelectorAll(".stepdue").forEach(inp=>{edit.steps[+inp.dataset.i].due=inp.value||null;});
+      edit.anchor_date=anchor;
+    }
+    touch(edit);save();closeSheet();render();return;
+  }
+  const ty=sheet.querySelector('input[name="ty"]:checked').value;
+  const base={id:uid(),title,project_id,priority,note,status:"active",created_at:todayStr(),updated_at:Date.now(),last_touched_at:todayStr(),done_at:null};
+  if(ty==="single"){const due=document.getElementById("f-due")?.value||null;state.tasks.push({...base,type:"single",due});}
+  else{
+    const tp=tmpl(document.getElementById("f-tmpl").value),anchor=document.getElementById("f-anchor").value||todayStr();
+    const steps=tp.steps.map(s=>({name:s.name,offset:s.offset,due:addDays(anchor,s.offset),done:false}));
+    state.tasks.push({...base,type:"flow",template_id:tp.id,anchor_date:anchor,steps});
+  }
+  save();closeSheet();tab="tasks";render();
+}
+
+//========================= 設定 =========================
+function syncSectionHTML(){
+  const cfg=sbConfig();
+  let h=`<h2 class="section">${icon("bell",16)} 同期（スマホ・PCで共有）</h2><div class="settings-card card">`;
+  if(!window.supabase){
+    h+=`<div class="hint">同期ライブラリを読み込めませんでした（オフラインの可能性）。オンラインで開き直すと使えます。今はローカル保存のみで動作中です。</div>`;
+  }else if(!cfg){
+    h+=`<div class="hint">クラウド保存でスマホとPCのデータを共有できます。Supabase（無料）の接続情報を入力してください。手順は README の「同期の設定」を参照。</div>
+      <label class="f">Supabase URL</label><input id="sb-url" placeholder="https://xxxx.supabase.co">
+      <label class="f">anon key（公開キー）</label><input id="sb-key" placeholder="eyJ...">
+      <div class="rowbtns"><button class="btn sm" id="sb-save">接続する</button></div>`;
+  }else if(!sbUser){
+    h+=`<div class="hint">メールとパスワードでログインします。初回だけ「新規登録」、次回からは「ログイン」。<b>同じメール・パスワードでログインすれば、どの端末でも同じデータ</b>になります。</div>
+      <label class="f">メールアドレス</label><input id="sb-email" type="email" value="${escAttr(otpEmail)}" placeholder="you@example.com">
+      <label class="f">パスワード</label><input id="sb-pass" type="password" placeholder="6文字以上">
+      <div class="rowbtns"><button class="btn sm" id="sb-login">ログイン</button><button class="btn ghost sm" id="sb-signup">新規登録（初回）</button></div>
+      <div class="hint" id="sb-msg"></div>
+      <div class="rowbtns" style="margin-top:8px"><button class="btn link" id="sb-reset">接続情報を消す</button></div>`;
+  }else{
+    const st=syncStatus==="err"?" ・ ⚠️同期エラー（通信状況を確認）":syncStatus==="ok"?" ・ ✅同期OK":"";
+    h+=`<div class="hint">ログイン中：<b>${esc(sbUser.email||"")}</b><br>${lastSync?("最終同期 "+new Date(lastSync).toLocaleString("ja-JP")):"未同期"}${st}</div>
+      <div class="rowbtns"><button class="btn sm" id="sb-sync">今すぐ同期</button><button class="btn ghost sm" id="sb-logout">ログアウト</button></div>`;
+  }
+  return h+`</div>`;
+}
+function bindSync(){
+  const q=id=>document.getElementById(id);
+  if(q("sb-save"))q("sb-save").onclick=()=>{const url=q("sb-url").value.trim(),key=q("sb-key").value.trim();if(!url||!key){alert("URLとanon keyを入力してください");return;}setSbConfig({url,key});initSupabase().then(()=>render());};
+  if(q("sb-login"))q("sb-login").onclick=async()=>{const email=q("sb-email").value.trim(),password=q("sb-pass").value;otpEmail=email;if(!email||!password){q("sb-msg").textContent="メールとパスワードを入力してください";return;}q("sb-msg").textContent="ログイン中…";try{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;/* onAuthStateChangeが同期＆再描画 */}catch(e){q("sb-msg").textContent="ログインできません（メール／パスワードを確認、または初回は新規登録）："+e.message;}};
+  if(q("sb-signup"))q("sb-signup").onclick=async()=>{const email=q("sb-email").value.trim(),password=q("sb-pass").value;otpEmail=email;if(!email||password.length<6){q("sb-msg").textContent="メールと6文字以上のパスワードを入力してください";return;}q("sb-msg").textContent="登録中…";try{const {data,error}=await sb.auth.signUp({email,password});if(error)throw error;if(!data.session){q("sb-msg").textContent="登録しました。Supabaseで『メール確認』がオンのようです。設定でオフにするか、届いた確認メールのリンクを開いてからログインしてください。";}/* session ありなら onAuthStateChange が処理 */}catch(e){q("sb-msg").textContent="登録に失敗："+e.message;}};
+  if(q("sb-reset"))q("sb-reset").onclick=()=>{if(confirm("接続情報を消しますか？（この端末のローカルデータは残ります）")){localStorage.removeItem("nari-sb");sb=null;sbUser=null;render();}};
+  if(q("sb-sync"))q("sb-sync").onclick=()=>pullThenMaybePush();
+  if(q("sb-logout"))q("sb-logout").onclick=async()=>{await sb.auth.signOut();sbUser=null;render();};
+}
+
+function renderSettings(){
+  let h=syncSectionHTML();
+  h+=`<h2 class="section">${icon("star",16)} カラーパレット</h2><div class="pal-grid">`;
+  Object.entries(PALETTES).forEach(([k,p])=>{
+    const on=state.settings.palette===k;
+    h+=`<div class="pal ${on?"on":""}" data-pal="${k}">
+      <div class="sw">${p.sw.map(c=>`<i style="background:${c}"></i>`).join("")}</div>
+      <div class="pn">${p.label}</div><div class="chk">${on?"✓ 使用中":""}</div></div>`;
+  });
+  h+=`</div>`;
+
+  h+=`<h2 class="section">${icon("folder",16)} テンプレート</h2>`;
+  state.templates.forEach(tp=>{
+    h+=`<div class="settings-card card"><h3>${esc(tp.name)}</h3><div class="hint">基準：${esc(tp.anchorLabel)}（オフセット0の工程）</div>
+      <div style="margin-top:8px">${tp.steps.map(s=>{const off=s.offset===0?"基準":(s.offset>0?"+"+s.offset:s.offset)+"日";
+        return `<div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0"><span>${esc(s.name)}</span><span style="color:var(--muted)">${off}</span></div>`;}).join("")}</div>
+      <div class="rowbtns"><button class="btn ghost sm" data-tmpl="${tp.id}">${icon("pencil",15)} 編集</button></div></div>`;
+  });
+  h+=`<div class="rowbtns"><button class="btn ghost sm" id="add-tmpl">＋ テンプレートを追加</button></div>`;
+
+  h+=`<h2 class="section">${icon("folder",16)} プロジェクト</h2><div class="settings-card card">`;
+  state.projects.forEach(p=>h+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+    <span style="width:12px;height:12px;border-radius:50%;background:${p.color}"></span><span style="flex:1">${esc(p.name)}</span>
+    <button class="btn link" data-delproj="${p.id}">削除</button></div>`);
+  h+=`<div class="rowbtns"><button class="btn ghost sm" id="add-proj">＋ プロジェクト追加</button></div></div>`;
+
+  h+=`<h2 class="section">${icon("bell",16)} リマインド設定</h2><div class="settings-card card">
+    <label class="f">何日動きがなければ「放置」とみなすか</label><input type="number" id="stale" value="${state.settings.staleDays}" min="1" style="width:110px"></div>`;
+
+  h+=`<h2 class="section">${icon("gear",16)} データ</h2><div class="settings-card card">
+    <div class="hint">データはこの端末のブラウザ内に保存されています。バックアップや別端末への移動はエクスポート/インポートで行えます。</div>
+    <div class="rowbtns" style="margin-top:10px"><button class="btn ghost sm" id="export">エクスポート</button><button class="btn ghost sm" id="import">インポート</button></div></div>`;
+
+  view.innerHTML=h;
+  bindSync();
+  view.querySelectorAll("[data-pal]").forEach(b=>b.onclick=()=>{state.settings.palette=b.dataset.pal;applyPalette(b.dataset.pal);save();render();});
+  view.querySelectorAll("[data-tmpl]").forEach(b=>b.onclick=()=>openTemplateSheet(tmpl(b.dataset.tmpl)));
+  document.getElementById("add-tmpl").onclick=()=>openTemplateSheet(null);
+  view.querySelectorAll("[data-delproj]").forEach(b=>b.onclick=()=>{
+    const id=b.dataset.delproj;
+    if(state.tasks.some(t=>t.project_id===id)){alert("このプロジェクトにタスクが残っています。先に移動/削除してください。");return;}
+    if(confirm("削除しますか？")){state.projects=state.projects.filter(p=>p.id!==id);save();render();}
+  });
+  document.getElementById("add-proj").onclick=()=>{
+    const name=prompt("プロジェクト名");if(!name)return;
+    const colors=["#A9501C","#984A39","#183451","#65BCB5","#663924","#8DB6C7"];
+    state.projects.push({id:uid(),name:name.trim(),color:colors[state.projects.length%colors.length]});save();render();
+  };
+  document.getElementById("stale").onchange=e=>{state.settings.staleDays=Math.max(1,+e.target.value||5);save();};
+  document.getElementById("export").onclick=exportData;document.getElementById("import").onclick=importData;
+}
+
+function openTemplateSheet(edit){
+  const t=edit||{name:"",anchorLabel:"",steps:[{name:"",offset:0}]},isEdit=!!edit;
+  const draft=JSON.parse(JSON.stringify(t));
+  const rows=()=>draft.steps.map((s,i)=>`<div class="tmpl-step"><input class="nm" data-i="${i}" value="${escAttr(s.name)}" placeholder="工程名"><input class="of" type="number" data-i="${i}" value="${s.offset}"><button class="x" data-x="${i}">×</button></div>`).join("");
+  const draw=()=>{
+    sheet.innerHTML=`<h3>${isEdit?"テンプレート編集":"テンプレート追加"}</h3>
+      <label class="f">テンプレート名</label><input id="tp-name" value="${escAttr(draft.name)}" placeholder="例：YouTube">
+      <label class="f">基準工程の呼び名（日付入力のラベル）</label><input id="tp-anchor" value="${escAttr(draft.anchorLabel)}" placeholder="例：撮影">
+      <label class="f">工程（右の数字＝基準日から±日、基準は0）</label><div id="tp-steps">${rows()}</div>
+      <button class="btn ghost sm" id="tp-add" style="margin-top:4px">＋ 工程を追加</button>
+      <div class="hint">上から順番に並びます。マイナス（例：-1）で基準日より前になります。</div>
+      <div class="sheet-actions"><button class="btn ghost" id="tp-cancel">キャンセル</button><button class="btn" id="tp-save">保存</button></div>
+      ${isEdit?`<div style="text-align:center;margin-top:10px"><button class="btn danger" id="tp-del">削除</button></div>`:""}`;
+    sheet.querySelectorAll(".nm").forEach(inp=>inp.oninput=e=>{draft.steps[+e.target.dataset.i].name=e.target.value;});
+    sheet.querySelectorAll(".of").forEach(inp=>inp.oninput=e=>{draft.steps[+e.target.dataset.i].offset=+e.target.value||0;});
+    sheet.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{draft.steps.splice(+b.dataset.x,1);if(!draft.steps.length)draft.steps.push({name:"",offset:0});draw();});
+    document.getElementById("tp-add").onclick=()=>{draft.name=document.getElementById("tp-name").value;draft.anchorLabel=document.getElementById("tp-anchor").value;draft.steps.push({name:"",offset:0});draw();};
+    document.getElementById("tp-cancel").onclick=closeSheet;
+    document.getElementById("tp-save").onclick=()=>{
+      draft.name=document.getElementById("tp-name").value.trim();draft.anchorLabel=document.getElementById("tp-anchor").value.trim()||"基準";
+      draft.steps=draft.steps.filter(s=>s.name.trim());
+      if(!draft.name){alert("テンプレート名を入力してください");return;}
+      if(!draft.steps.length){alert("工程を1つ以上入れてください");return;}
+      if(isEdit){edit.name=draft.name;edit.anchorLabel=draft.anchorLabel;edit.steps=draft.steps;}else state.templates.push({id:uid(),...draft});
+      save();closeSheet();render();
+    };
+    if(isEdit)document.getElementById("tp-del").onclick=()=>{
+      if(state.tasks.some(x=>x.template_id===edit.id)){if(!confirm("このテンプレートから作られたタスクがあります。既存タスクは残ります。削除しますか？"))return;}else if(!confirm("削除しますか？"))return;
+      state.templates=state.templates.filter(x=>x.id!==edit.id);save();closeSheet();render();
+    };
+  };
+  draw();overlay.classList.add("on");
+}
+
+//========================= エクスポート/インポート =========================
+function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="nari-management-backup-"+todayStr()+".json";a.click();}
+function importData(){
+  const inp=document.createElement("input");inp.type="file";inp.accept="application/json";
+  inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+    rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!d.tasks||!d.projects){alert("形式が正しくないファイルです");return;}
+      if(confirm("現在のデータを、読み込んだ内容で置き換えます。よろしいですか？")){state=d;if(!state.settings)state.settings={palette:"riviera",staleDays:5};applyPalette(state.settings.palette);save();render();}
+    }catch(err){alert("読み込みに失敗しました");}};rd.readAsText(f);};
+  inp.click();
+}
+
+//========================= 共通 =========================
+function esc(s){return String(s==null?"":s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function escAttr(s){return esc(s).replace(/"/g,"&quot;");}
+
+document.getElementById("fab").innerHTML=icon("plus",30);
+document.getElementById("fab").onclick=()=>openTaskSheet(null);
+document.querySelectorAll(".tabic").forEach(s=>s.innerHTML=icon(s.dataset.ic,22));
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
+
+applyPalette(state.settings.palette||"riviera");
+render();
+
+// PWA: Service Worker 登録（https / localhost のみ有効）
+if("serviceWorker" in navigator){navigator.serviceWorker.register("sw.js").catch(()=>{});}
+// 同期の初期化＋復帰時に自動プル
+initSupabase();
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")pullThenMaybePush();});
+window.addEventListener("online",()=>pullThenMaybePush());
+</script>
+</body>
+</html>
