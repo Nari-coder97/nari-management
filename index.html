@@ -153,6 +153,35 @@
   .pal .sw i{width:26px;height:26px;border-radius:7px;display:block}
   .pal .pn{font-size:13.5px;font-weight:700}
   .pal .chk{font-size:11px;color:var(--accent);font-weight:700;height:14px}
+
+  /* 折りたたみ（テンプレート） */
+  details.fold{margin-top:6px}
+  details.fold summary{cursor:pointer;font-size:13.5px;color:var(--accent);font-weight:700;padding:6px 0;list-style:none}
+  details.fold summary::-webkit-details-marker{display:none}
+  details.fold summary::before{content:"▼ ";font-size:10px}
+  details.fold[open] summary::before{content:"▲ "}
+
+  /* カレンダー */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin:10px 0}
+  .cal-title{font-weight:800;font-size:18px}
+  .cal-nav{background:var(--surface);border:1px solid var(--border);color:var(--ink);width:44px;padding:8px 0;font-size:18px;border-radius:12px}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+  .cal-dow{margin-bottom:5px}
+  .cal-dow-c{text-align:center;font-size:11.5px;color:var(--muted);font-weight:700}
+  .cal-dow-c.sun{color:var(--danger)}
+  .cal-dow-c.sat{color:#4a6e8a}
+  .cal-cell{background:var(--surface);border:1px solid var(--border);border-radius:11px;min-height:54px;padding:5px 3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .cal-cell.empty{background:transparent;border:none;cursor:default}
+  .cal-cell.today{border-color:var(--accent);border-width:2px}
+  .cal-cell.sel{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:var(--accent)}
+  .cal-num{font-size:12.5px;font-weight:700}
+  .cal-dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;max-width:90%}
+  .cal-dot{width:6px;height:6px;border-radius:50%;display:block}
+  .cal-item{display:flex;align-items:center;gap:9px;padding:12px 14px;margin-bottom:8px}
+  .ci-title{flex:1;font-size:14.5px;font-weight:600}
+  .ci-title.done{color:var(--muted);text-decoration:line-through}
+  .ci-step{color:var(--muted);font-weight:500;font-size:13px}
+  .ci-done{color:var(--secondary);font-weight:800;font-size:16px}
 </style>
 </head>
 <body>
@@ -169,6 +198,7 @@
 <nav class="tabs">
   <button data-tab="home" class="on"><span class="tabic" data-ic="home"></span>今日</button>
   <button data-tab="tasks"><span class="tabic" data-ic="folder"></span>タスク</button>
+  <button data-tab="calendar"><span class="tabic" data-ic="calendar"></span>カレンダー</button>
   <button data-tab="settings"><span class="tabic" data-ic="gear"></span>設定</button>
 </nav>
 
@@ -187,6 +217,7 @@ const IC={
   star:"M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z",
   pencil:"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
   check:"M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  calendar:"M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm0 16H5V10h14v10z",
 };
 function icon(name,size=20){return `<svg class="ic-svg" viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" aria-hidden="true"><path d="${IC[name]}"/></svg>`;}
 
@@ -314,11 +345,12 @@ function unitsInPeriod(task,from,to){
 //========================= 状態 =========================
 let tab="home", taskFilter="all", showDone=false;
 let period="week", customFrom=null, customTo=null;
+let expandedTasks=new Set(), calMonth=null, calSelected=todayStr();
 const view=document.getElementById("view");
 
 function render(){
   document.getElementById("todayLabel").textContent=fmtDate(todayStr());
-  if(tab==="home")renderHome();else if(tab==="tasks")renderTasks();else renderSettings();
+  if(tab==="home")renderHome();else if(tab==="tasks")renderTasks();else if(tab==="calendar")renderCalendar();else renderSettings();
   document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
 }
 
@@ -430,13 +462,18 @@ function taskCard(t,compact){
   inner+=`</div></div>`;
   if(t.type==="flow"){
     const ci=curStepIndex(t);const dc=t.steps.filter(s=>s.done).length;
+    const expanded=expandedTasks.has(t.id);
+    const start=ci>=0?ci:0;
+    const shown=expanded?t.steps.map((s,i)=>[s,i]):t.steps.map((s,i)=>[s,i]).slice(start,start+3);
     inner+=`<div class="progress"><i style="width:${t.steps.length?dc/t.steps.length*100:0}%"></i></div><div class="steps">`;
-    t.steps.forEach((s,i)=>{inner+=`<div class="step ${s.done?"done":""} ${i===ci?"cur":""}">
+    shown.forEach(([s,i])=>{inner+=`<div class="step ${s.done?"done":""} ${i===ci?"cur":""}">
       <div class="dot" data-act="toggle-step" data-i="${i}"></div><div class="sname">${esc(s.name)}</div>
       ${s.due?dueSpan(s.due,true):""}</div>`;});
     inner+=`</div>`;
-    if(!done&&ci>=0)inner+=`<div class="rowbtns"><button class="btn green sm" data-act="advance">${icon("check",15)} 「${esc(t.steps[ci].name)}」を完了</button><button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
-    else inner+=`<div class="rowbtns"><button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
+    inner+=`<div class="rowbtns">`;
+    if(!done&&ci>=0)inner+=`<button class="btn green sm" data-act="advance">${icon("check",15)} 「${esc(t.steps[ci].name)}」を完了</button>`;
+    if(t.steps.length>shown.length||expanded)inner+=`<button class="btn ghost sm" data-act="toggle-expand">${expanded?"▲ 閉じる":"▼ 全工程 ("+t.steps.length+")"}</button>`;
+    inner+=`<button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
   }else{
     inner+=`<div class="rowbtns"><button class="btn ghost sm" data-act="edit">${icon("pencil",15)} 編集</button></div>`;
   }
@@ -457,6 +494,7 @@ function bindTaskCards(){
       if(act==="toggle-single"){t.status=t.status==="done"?"active":"done";t.done_at=t.status==="done"?todayStr():null;touch(t);}
       else if(act==="toggle-step"){t.steps[+b.dataset.i].done=!t.steps[+b.dataset.i].done;touch(t);}
       else if(act==="advance"){const ci=curStepIndex(t);if(ci>=0)t.steps[ci].done=true;touch(t);}
+      else if(act==="toggle-expand"){if(expandedTasks.has(t.id))expandedTasks.delete(t.id);else expandedTasks.add(t.id);render();return;}
       else if(act==="edit"){openTaskSheet(t);return;}
       save();render();
     });
@@ -546,6 +584,48 @@ function saveTask(edit){
   save();closeSheet();tab="tasks";render();
 }
 
+//========================= カレンダー =========================
+function renderCalendar(){
+  if(!calMonth){const d=parseD(calSelected||todayStr());calMonth=new Date(d.getFullYear(),d.getMonth(),1);}
+  const year=calMonth.getFullYear(),mon=calMonth.getMonth();
+  const startDow=new Date(year,mon,1).getDay();
+  const daysInMonth=new Date(year,mon+1,0).getDate();
+  // 日付→予定（単発タスク＋フロー各工程）
+  const map={};const push=(k,v)=>{(map[k]=map[k]||[]).push(v);};
+  state.tasks.forEach(t=>{
+    if(t.type==="single"){if(t.due)push(t.due,{color:projColor(t),title:t.title,done:isDone(t)});}
+    else t.steps.forEach(s=>{if(s.due)push(s.due,{color:projColor(t),title:t.title,step:s.name,done:s.done});});
+  });
+  let h=`<div class="cal-head"><button class="cal-nav" data-cal="prev">‹</button>
+    <div class="cal-title">${year}年${mon+1}月</div>
+    <button class="cal-nav" data-cal="next">›</button></div>
+    <div class="rowbtns" style="justify-content:center;margin:-2px 0 10px"><button class="btn ghost sm" data-cal="today">今日へ</button></div>`;
+  h+=`<div class="cal-grid cal-dow">`+WD.map((w,i)=>`<div class="cal-dow-c ${i===0?"sun":i===6?"sat":""}">${w}</div>`).join("")+`</div>`;
+  h+=`<div class="cal-grid">`;
+  for(let i=0;i<startDow;i++)h+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=ymd(new Date(year,mon,d));const items=map[ds]||[];
+    const dots=items.slice(0,4).map(it=>`<span class="cal-dot" style="background:${it.color};opacity:${it.done?.3:1}"></span>`).join("");
+    h+=`<div class="cal-cell ${ds===todayStr()?"today":""} ${ds===calSelected?"sel":""}" data-day="${ds}">
+      <div class="cal-num">${d}</div><div class="cal-dots">${dots}</div></div>`;
+  }
+  h+=`</div>`;
+  const items=map[calSelected]||[];
+  h+=`<h2 class="section">${icon("calendar",16)} ${fmtDate(calSelected)} の予定</h2>`;
+  if(items.length===0)h+=`<div class="empty">この日の予定はありません。</div>`;
+  else items.forEach(it=>h+=`<div class="cal-item card"><span class="pdot" style="background:${it.color}"></span>
+    <span class="ci-title ${it.done?"done":""}">${esc(it.title)}${it.step?` <span class="ci-step">— ${esc(it.step)}</span>`:""}</span>
+    ${it.done?`<span class="ci-done">✓</span>`:""}</div>`);
+  view.innerHTML=h;
+  view.querySelectorAll("[data-cal]").forEach(b=>b.onclick=()=>{
+    if(b.dataset.cal==="prev")calMonth=new Date(year,mon-1,1);
+    else if(b.dataset.cal==="next")calMonth=new Date(year,mon+1,1);
+    else{const t=new Date();calMonth=new Date(t.getFullYear(),t.getMonth(),1);calSelected=todayStr();}
+    render();
+  });
+  view.querySelectorAll("[data-day]").forEach(c=>c.onclick=()=>{calSelected=c.dataset.day;render();});
+}
+
 //========================= 設定 =========================
 function syncSectionHTML(){
   const cfg=sbConfig();
@@ -594,9 +674,10 @@ function renderSettings(){
 
   h+=`<h2 class="section">${icon("folder",16)} テンプレート</h2>`;
   state.templates.forEach(tp=>{
-    h+=`<div class="settings-card card"><h3>${esc(tp.name)}</h3><div class="hint">基準：${esc(tp.anchorLabel)}（オフセット0の工程）</div>
+    h+=`<div class="settings-card card"><h3>${esc(tp.name)}</h3><div class="hint">基準：${esc(tp.anchorLabel)}（オフセット0の工程）・全${tp.steps.length}工程</div>
+      <details class="fold"><summary>工程を表示</summary>
       <div style="margin-top:8px">${tp.steps.map(s=>{const off=s.offset===0?"基準":(s.offset>0?"+"+s.offset:s.offset)+"日";
-        return `<div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0"><span>${esc(s.name)}</span><span style="color:var(--muted)">${off}</span></div>`;}).join("")}</div>
+        return `<div style="display:flex;justify-content:space-between;font-size:14px;padding:3px 0"><span>${esc(s.name)}</span><span style="color:var(--muted)">${off}</span></div>`;}).join("")}</div></details>
       <div class="rowbtns"><button class="btn ghost sm" data-tmpl="${tp.id}">${icon("pencil",15)} 編集</button></div></div>`;
   });
   h+=`<div class="rowbtns"><button class="btn ghost sm" id="add-tmpl">＋ テンプレートを追加</button></div>`;
