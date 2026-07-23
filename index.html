@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="nari管理">
 <meta name="theme-color" content="#183451">
 <link rel="manifest" href="manifest.webmanifest">
@@ -22,7 +23,9 @@
   html,body{margin:0;padding:0}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",system-ui,sans-serif;
-    background:var(--bg); color:var(--ink); line-height:1.55; padding-bottom:92px;
+    background:var(--bg); color:var(--ink); line-height:1.55;
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:92px;
     -webkit-font-smoothing:antialiased; transition:background .3s;
   }
   .wrap{max-width:680px;margin:0 auto;padding:0 16px}
@@ -30,6 +33,9 @@
   header.app h1{font-size:19px;margin:0;letter-spacing:.02em;font-weight:800}
   header.app h1 span{color:var(--accent)}
   header.app .date{font-size:13px;color:var(--muted)}
+  .syncbadge{display:block;font-size:11px;font-weight:700;margin-top:2px;cursor:pointer}
+  .syncbadge.ok{color:var(--secondary)}
+  .syncbadge.err{color:var(--danger)}
   h2.section{font-size:13.5px;color:var(--muted);margin:22px 0 10px;font-weight:700;letter-spacing:.03em;display:flex;align-items:center;gap:5px}
   h2.section svg{opacity:.85}
   .ic-svg{vertical-align:middle;flex:none}
@@ -188,7 +194,7 @@
 <div class="wrap">
   <header class="app">
     <h1>nari <span>management</span></h1>
-    <span class="date" id="todayLabel"></span>
+    <div style="text-align:right"><span class="date" id="todayLabel"></span><span id="syncBadge" class="syncbadge"></span></div>
   </header>
   <main id="view"></main>
 </div>
@@ -248,7 +254,7 @@ const WD=["日","月","火","水","木","金","土"];
 function fmtDate(s){if(!s)return"";const d=parseD(s);return (d.getMonth()+1)+"/"+d.getDate()+"("+WD[d.getDay()]+")";}
 
 let state=load();
-function load(){try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(!s.settings)s.settings={};if(!s.settings.palette)s.settings.palette="riviera";if(s.settings.staleDays==null)s.settings.staleDays=5;return s;}}catch(e){}return seed();}
+function load(){try{const raw=localStorage.getItem(KEY);if(raw){const s=JSON.parse(raw);if(!s.settings)s.settings={};if(!s.settings.palette)s.settings.palette="riviera";if(s.settings.staleDays==null)s.settings.staleDays=5;if(s.updated_at==null)s.updated_at=0;return s;}}catch(e){}return seed();}
 function save(push=true){if(push)state.updated_at=Date.now();localStorage.setItem(KEY,JSON.stringify(state));if(push)schedulePush();}
 function seed(){
   return {
@@ -264,13 +270,14 @@ function seed(){
     ],
     tasks:[],
     settings:{staleDays:5,palette:"riviera"},
-    updated_at:Date.now(),
+    updated_at:0,
   };
 }
 
 //========================= 同期（Supabase） =========================
-let sb=null, sbUser=null, lastSync=0, syncStatus="";
+let sb=null, sbUser=null, lastSync=0, syncStatus="", syncError="";
 let pushTimer=null, otpSent=false, otpEmail="";
+function nonEmpty(s){return !!(s&&s.tasks&&s.tasks.length>0);}
 function sbConfig(){try{return JSON.parse(localStorage.getItem("nari-sb")||"null");}catch(e){return null;}}
 function setSbConfig(c){localStorage.setItem("nari-sb",JSON.stringify(c));}
 
@@ -285,29 +292,56 @@ async function initSupabase(){
     if(sbUser)await pullThenMaybePush();
   }catch(e){syncStatus="err";}
 }
+function setSync(st,err){syncStatus=st;syncError=err||"";updateSyncBadge();if(tab==="settings")render();}
+function updateSyncBadge(){
+  const b=document.getElementById("syncBadge");if(!b)return;
+  if(!sbUser){b.textContent="";b.className="syncbadge";return;}
+  const m={syncing:"⟳ 同期中",ok:"✓ 同期済み",err:"⚠ 同期エラー"}[syncStatus]||"✓ 同期";
+  b.textContent=m;b.className="syncbadge "+(syncStatus==="err"?"err":"ok");
+  b.onclick=()=>{tab="settings";render();};
+}
 function schedulePush(){if(!sb||!sbUser)return;clearTimeout(pushTimer);pushTimer=setTimeout(pushRemote,800);}
+
+// ローカルへ採用（リモートで上書き）。タイムスタンプは維持し、再pushしない。
+function adoptRemote(remote){
+  state=remote;
+  if(!state.settings)state.settings={staleDays:5,palette:"riviera"};
+  if(state.updated_at==null)state.updated_at=0;
+  localStorage.setItem(KEY,JSON.stringify(state));
+  applyPalette(state.settings.palette||"riviera");
+  render();
+}
+
 async function pushRemote(){
   if(!sb||!sbUser)return;
+  setSync("syncing");
   try{
     const {error}=await sb.from("app_state").upsert({user_id:sbUser.id,data:state,updated_at:new Date().toISOString()});
-    if(error)throw error;syncStatus="ok";lastSync=Date.now();
-  }catch(e){syncStatus="err";}
-  if(tab==="settings")render();
+    if(error)throw error;
+    lastSync=Date.now();setSync("ok");
+  }catch(e){setSync("err",e.message||String(e));}
 }
+
 async function pullThenMaybePush(){
   if(!sb||!sbUser)return;
+  setSync("syncing");
   try{
     const {data,error}=await sb.from("app_state").select("data").eq("user_id",sbUser.id).maybeSingle();
     if(error)throw error;
-    if(!data){await pushRemote();}
-    else{
-      const remote=data.data,rl=(remote&&remote.updated_at)||0,ll=state.updated_at||0;
-      if(rl>ll){state=remote;save(false);applyPalette(state.settings?.palette||"riviera");render();}
-      else if(ll>rl){await pushRemote();}
+    const remote=data?data.data:null;
+    if(!remote){
+      // リモートにまだ無ければローカルを保存
+      await pushRemote();return;
     }
-    syncStatus="ok";lastSync=Date.now();
-  }catch(e){syncStatus="err";}
-  if(tab==="settings")render();
+    const localHas=nonEmpty(state), remoteHas=nonEmpty(remote);
+    const rl=remote.updated_at||0, ll=state.updated_at||0;
+    // 中身がある方を常に優先（空データによる上書きを禁止）
+    if(remoteHas && !localHas){ adoptRemote(remote); lastSync=Date.now(); setSync("ok"); }
+    else if(localHas && !remoteHas){ await pushRemote(); }
+    else if(rl>ll){ adoptRemote(remote); lastSync=Date.now(); setSync("ok"); }
+    else if(ll>rl){ await pushRemote(); }
+    else { lastSync=Date.now(); setSync("ok"); }
+  }catch(e){setSync("err",e.message||String(e));}
 }
 
 //========================= ヘルパ =========================
@@ -350,6 +384,7 @@ const view=document.getElementById("view");
 
 function render(){
   document.getElementById("todayLabel").textContent=fmtDate(todayStr());
+  updateSyncBadge();
   if(tab==="home")renderHome();else if(tab==="tasks")renderTasks();else if(tab==="calendar")renderCalendar();else renderSettings();
   document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
 }
@@ -645,9 +680,11 @@ function syncSectionHTML(){
       <div class="hint" id="sb-msg"></div>
       <div class="rowbtns" style="margin-top:8px"><button class="btn link" id="sb-reset">接続情報を消す</button></div>`;
   }else{
-    const st=syncStatus==="err"?" ・ ⚠️同期エラー（通信状況を確認）":syncStatus==="ok"?" ・ ✅同期OK":"";
-    h+=`<div class="hint">ログイン中：<b>${esc(sbUser.email||"")}</b><br>${lastSync?("最終同期 "+new Date(lastSync).toLocaleString("ja-JP")):"未同期"}${st}</div>
-      <div class="rowbtns"><button class="btn sm" id="sb-sync">今すぐ同期</button><button class="btn ghost sm" id="sb-logout">ログアウト</button></div>`;
+    const badge=syncStatus==="syncing"?"⟳ 同期中…":syncStatus==="err"?"⚠️ 同期エラー":syncStatus==="ok"?"✅ 同期済み":"";
+    const tasks=state.tasks?state.tasks.length:0;
+    h+=`<div class="hint">ログイン中：<b>${esc(sbUser.email||"")}</b><br>タスク ${tasks}件 ・ ${lastSync?("最終同期 "+new Date(lastSync).toLocaleString("ja-JP")):"未同期"} ${badge}</div>`;
+    if(syncStatus==="err"&&syncError)h+=`<div class="hint" style="color:var(--danger)">エラー内容：${esc(syncError)}<br>（テーブル未作成 / RLS設定 / 通信 のいずれかが原因のことが多いです）</div>`;
+    h+=`<div class="rowbtns"><button class="btn sm" id="sb-sync">今すぐ同期</button><button class="btn ghost sm" id="sb-logout">ログアウト</button></div>`;
   }
   return h+`</div>`;
 }

@@ -1,6 +1,6 @@
 // nari-management Service Worker
 // HTML本体はネットワーク優先（更新をすぐ反映）、アイコン等はキャッシュ優先。オフラインでも起動可能。
-const CACHE = "nari-v3";
+const CACHE = "nari-v4";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./icon-180.png"
